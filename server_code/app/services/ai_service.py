@@ -12,6 +12,8 @@ from app.services.pdf_utils import guess_supplier, pdf_to_base64_images
 
 logger = logging.getLogger(__name__)
 
+MAX_AI_LOG_CHARS = 4000
+
 AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN10204 3.1）审核专家。
 请分析材质报告图片，提取关键信息并判断化学成分和力学性能是否符合标准要求。
 
@@ -82,6 +84,12 @@ def _build_extraction(data: dict, file_name: str) -> tuple[str, AiExtractionResu
         reasons=reasons,
     )
     return ai_result, extraction, reasons
+
+
+def _truncate_for_log(text: str, max_chars: int = MAX_AI_LOG_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars]}...<truncated {len(text) - max_chars} chars>"
 
 
 class BaseAiClient(ABC):
@@ -179,27 +187,76 @@ async def _audit_with_vision_api(
     if request_options:
         payload.update(request_options)
 
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(
-            f"{base_url.rstrip('/')}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-        if response.is_error:
-            logger.error(
-                "视觉模型调用失败 status=%s model=%s body=%s",
-                response.status_code,
-                model,
-                response.text[:1000],
+    endpoint = f"{base_url.rstrip('/')}/chat/completions"
+    logger.info(
+        "开始调用视觉模型 model=%s endpoint=%s file=%s image_count=%s timeout=%ss",
+        model,
+        endpoint,
+        file_name,
+        len(images),
+        timeout,
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            response = await client.post(
+                endpoint,
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
             )
-            response.raise_for_status()
+    except httpx.HTTPError as exc:
+        elapsed = (time.perf_counter() - start) * 1000
+        logger.exception(
+            "视觉模型请求异常 model=%s endpoint=%s elapsed_ms=%.2f error=%s",
+            model,
+            endpoint,
+            elapsed,
+            exc,
+        )
+        raise
+
+    elapsed = (time.perf_counter() - start) * 1000
+    raw_response = response.text
+    logger.info(
+        "视觉模型返回 status=%s model=%s elapsed_ms=%.2f body=%s",
+        response.status_code,
+        model,
+        elapsed,
+        _truncate_for_log(raw_response),
+    )
+
+    if response.is_error:
+        logger.error(
+            "视觉模型调用失败 status=%s model=%s elapsed_ms=%.2f body=%s",
+            response.status_code,
+            model,
+            elapsed,
+            _truncate_for_log(raw_response),
+        )
+        response.raise_for_status()
+
+    try:
         body = response.json()
+    except ValueError:
+        logger.exception(
+            "视觉模型返回非 JSON model=%s elapsed_ms=%.2f body=%s",
+            model,
+            elapsed,
+            _truncate_for_log(raw_response),
+        )
+        raise
 
     text = body["choices"][0]["message"]["content"]
     text = text.strip()
+    logger.info(
+        "视觉模型消息内容 model=%s elapsed_ms=%.2f content=%s",
+        model,
+        elapsed,
+        _truncate_for_log(text),
+    )
     if text.startswith("```"):
         text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
