@@ -86,9 +86,24 @@ def _build_extraction(data: dict, file_name: str) -> tuple[str, AiExtractionResu
             chemical.append(ChemicalItem(**c))
         else:
             chemical.append(c)
-    mechanical = [
-        MechanicalItem(**m) if isinstance(m, dict) else m for m in (data.get("mechanical") or [])
-    ]
+    mechanical_raw = data.get("mechanical") or []
+    mechanical = []
+    for m in mechanical_raw:
+        if isinstance(m, dict):
+            m_min = m.get("min", "")
+            m_max = m.get("max", "")
+            if not m.get("requirement"):
+                if m_min and m_max:
+                    m["requirement"] = f"{m_min}–{m_max}"
+                elif m_max:
+                    m["requirement"] = f"≤{m_max}"
+                elif m_min:
+                    m["requirement"] = f"≥{m_min}"
+                else:
+                    m["requirement"] = ""
+            mechanical.append(MechanicalItem(**m))
+        else:
+            mechanical.append(m)
 
     extraction = AiExtractionResult(
         materialGrade=data.get("material_grade", ""),
