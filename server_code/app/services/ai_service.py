@@ -18,11 +18,11 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
 请分析材质报告图片，提取关键信息并判断化学成分和力学性能是否符合标准要求。
 
 重要要求：
-- chemical 中的 min、max、actual 必须从报告图片中实际读取，不要自行假设或使用通用标准值。
-- 报告中化学成分的标准要求通常以 max（上限）或 min（下限）或范围（min-max）形式给出，请如实提取。
-- 如果报告中某元素只有 max 没有 min，则 min 填空字符串，反之亦然。
-- mechanical 中的 requirement 同样必须从报告图片中实际读取。
-- actual、min、max、requirement 都必须忠实反映报告中的原始数据。
+- min 表示下限（最小允许值），max 表示上限（最大允许值），请勿混淆。
+- 化学成分：报告中的标准要求绝大多数是上限（max），例如 "C: 0.07" 或 "C max 0.07" 表示碳含量不得超过 0.07，应填 max="0.07", min=""。只有少数元素（如 Cr、Ni、Mo）会给出范围（如 "16.0-18.0"），此时 min="16.0", max="18.0"。
+- 力学性能：Yield Strength、Tensile Strength、Elongation 等通常给的是下限（min），如 "min. 30" 表示不得低于 30，应填 min="30", max=""。Hardness 通常给的是上限（max）。
+- actual、min、max 都必须从报告图片中实际读取，不要自行假设或使用通用标准值。
+- 如果某项只有 min 没有 max，则 max 填空字符串，反之亦然。
 
 请严格返回 JSON（不要 markdown 代码块），格式如下：
 {
@@ -38,8 +38,8 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
   "chemical_composition": "OK 或 FAIL",
   "mechanical_properties": "OK 或 FAIL",
   "fields": [{"label": "Supplier", "value": "..."}],
-  "chemical": [{"element": "<元素符号>", "actual": "<报告中的实测值>", "min": "<报告中的下限值，无则为空>", "max": "<报告中的上限值，无则为空>", "status": "ok 或 fail"}],
-  "mechanical": [{"property": "<性能名称>", "actual": "<报告中的实测值>", "requirement": "<报告中的标准要求>", "status": "ok 或 fail"}]
+  "chemical": [{"element": "<元素符号>", "actual": "<报告中的实测值>", "min": "<下限，无则为空>", "max": "<上限，无则为空>", "status": "ok 或 fail"}],
+  "mechanical": [{"property": "<性能名称>", "actual": "<报告中的实测值>", "min": "<下限，无则为空>", "max": "<上限，无则为空>", "status": "ok 或 fail"}]
 }
 """
 
