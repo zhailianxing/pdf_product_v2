@@ -23,6 +23,8 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
 - 只有 Cr、Ni、Mo 等合金元素才会给出范围（同时有 min 和 max）。
 - 力学性能中 Yield Strength、Tensile Strength、Elongation 通常只有下限（min），没有上限，此时 max 必须为空字符串。
 - actual、min、max 都必须从报告图片中实际读取，不要自行假设。
+- 力学性能中如果有多个屈服强度指标（如 Rp1.0 和 Rp0.2），必须作为独立的行分别列出，不要合并或遗漏。
+- 报告中出现的每一项力学性能测试都必须列出，包括冲击值（Impact Value）等。
 
 请严格返回 JSON（不要 markdown 代码块），格式如下：
 {
@@ -43,12 +45,15 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
     {"element": "Cr", "actual": "16.8", "min": "16.0", "max": "18.0", "status": "ok"}
   ],
   "mechanical": [
-    {"property": "Yield Strength", "actual": "245", "min": "170", "max": "", "status": "ok"},
+    {"property": "Yield Strength Rp1.0", "actual": "269", "min": "210", "max": "", "status": "ok"},
+    {"property": "Yield Strength Rp0.2", "actual": "243", "min": "185", "max": "", "status": "ok"},
+    {"property": "Tensile Strength", "actual": "512", "min": "440", "max": "640", "status": "ok"},
+    {"property": "Elongation A%", "actual": "35", "min": "30", "max": "", "status": "ok"},
     {"property": "Hardness HB", "actual": "165", "min": "", "max": "217", "status": "ok"}
   ]
 }
 
-注意上面示例中：C 只有 max 没有 min，Cr 有 min 和 max 范围，Yield Strength 只有 min 没有 max，Hardness 只有 max 没有 min。请严格按此模式填写，不要把同一个值同时填入 min 和 max。
+注意上面示例中：C 只有 max 没有 min，Cr 有 min 和 max 范围。Yield Strength Rp1.0 和 Rp0.2 是两个独立的行，不要合并。请严格按此模式填写，不要把同一个值同时填入 min 和 max。
 """
 
 
