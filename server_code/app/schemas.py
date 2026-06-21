@@ -54,7 +54,9 @@ class FieldItem(BaseModel):
 class ChemicalItem(BaseModel):
     element: str
     actual: str
-    requirement: str
+    min: str = ""
+    max: str = ""
+    requirement: str = ""
     status: str
 
 

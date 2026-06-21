@@ -200,13 +200,14 @@ function rotateDoc() {
               <h4 class="section-title">化学成分</h4>
               <table class="table detail-table">
                 <thead>
-                  <tr><th>元素</th><th>实测值</th><th>要求</th><th>状态</th></tr>
+                  <tr><th>元素</th><th>实测值</th><th>下限(Min)</th><th>上限(Max)</th><th>状态</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="row in result.chemical" :key="row.element">
                     <td>{{ row.element }}</td>
                     <td>{{ row.actual }}</td>
-                    <td>{{ row.requirement }}</td>
+                    <td>{{ row.min || '—' }}</td>
+                    <td>{{ row.max || '—' }}</td>
                     <td>
                       <span :class="row.status === 'fail' ? 'tag tag-fail' : 'tag tag-pass'">
                         {{ row.status === 'fail' ? '超标' : 'OK' }}
@@ -262,13 +263,14 @@ function rotateDoc() {
               <h4 class="section-title">化学成分（争议指标高亮）</h4>
               <table class="table detail-table">
                 <thead>
-                  <tr><th>元素</th><th>实测值</th><th>要求</th><th>状态</th></tr>
+                  <tr><th>元素</th><th>实测值</th><th>下限(Min)</th><th>上限(Max)</th><th>状态</th></tr>
                 </thead>
                 <tbody>
                   <tr v-for="row in result.chemical" :key="row.element" :class="{ 'row-fail': row.status === 'fail' }">
                     <td>{{ row.element }}</td>
                     <td>{{ row.actual }}</td>
-                    <td>{{ row.requirement }}</td>
+                    <td>{{ row.min || '—' }}</td>
+                    <td>{{ row.max || '—' }}</td>
                     <td>
                       <span :class="row.status === 'fail' ? 'tag tag-fail' : 'tag tag-pass'">
                         {{ row.status === 'fail' ? '超标' : 'OK' }}

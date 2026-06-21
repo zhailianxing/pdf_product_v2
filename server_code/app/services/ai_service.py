@@ -17,6 +17,13 @@ MAX_AI_LOG_CHARS = 4000
 AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN10204 3.1）审核专家。
 请分析材质报告图片，提取关键信息并判断化学成分和力学性能是否符合标准要求。
 
+重要要求：
+- chemical 中的 min、max、actual 必须从报告图片中实际读取，不要自行假设或使用通用标准值。
+- 报告中化学成分的标准要求通常以 max（上限）或 min（下限）或范围（min-max）形式给出，请如实提取。
+- 如果报告中某元素只有 max 没有 min，则 min 填空字符串，反之亦然。
+- mechanical 中的 requirement 同样必须从报告图片中实际读取。
+- actual、min、max、requirement 都必须忠实反映报告中的原始数据。
+
 请严格返回 JSON（不要 markdown 代码块），格式如下：
 {
   "ai_result": "PASS 或 FAIL",
@@ -31,8 +38,8 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
   "chemical_composition": "OK 或 FAIL",
   "mechanical_properties": "OK 或 FAIL",
   "fields": [{"label": "Supplier", "value": "..."}],
-  "chemical": [{"element": "C", "actual": "0.018", "requirement": "≤0.030", "status": "ok"}],
-  "mechanical": [{"property": "Yield Strength", "actual": "245 MPa", "requirement": "≥170 MPa", "status": "ok"}]
+  "chemical": [{"element": "<元素符号>", "actual": "<报告中的实测值>", "min": "<报告中的下限值，无则为空>", "max": "<报告中的上限值，无则为空>", "status": "ok 或 fail"}],
+  "mechanical": [{"property": "<性能名称>", "actual": "<报告中的实测值>", "requirement": "<报告中的标准要求>", "status": "ok 或 fail"}]
 }
 """
 
@@ -61,9 +68,24 @@ def _build_extraction(data: dict, file_name: str) -> tuple[str, AiExtractionResu
             FieldItem(label="Date", value=data.get("date", "")),
         ]
 
-    chemical = [
-        ChemicalItem(**c) if isinstance(c, dict) else c for c in (data.get("chemical") or [])
-    ]
+    chemical_raw = data.get("chemical") or []
+    chemical = []
+    for c in chemical_raw:
+        if isinstance(c, dict):
+            c_min = c.get("min", "")
+            c_max = c.get("max", "")
+            if not c.get("requirement"):
+                if c_min and c_max:
+                    c["requirement"] = f"{c_min}–{c_max}"
+                elif c_max:
+                    c["requirement"] = f"≤{c_max}"
+                elif c_min:
+                    c["requirement"] = f"≥{c_min}"
+                else:
+                    c["requirement"] = ""
+            chemical.append(ChemicalItem(**c))
+        else:
+            chemical.append(c)
     mechanical = [
         MechanicalItem(**m) if isinstance(m, dict) else m for m in (data.get("mechanical") or [])
     ]
@@ -119,8 +141,8 @@ class MockAiClient(BaseAiClient):
                 "chemical_composition": "OK",
                 "mechanical_properties": "OK",
                 "chemical": [
-                    {"element": "C", "actual": "0.018", "requirement": "≤0.030", "status": "ok"},
-                    {"element": "S", "actual": "0.008", "requirement": "≤0.030", "status": "ok"},
+                    {"element": "C", "actual": "0.018", "min": "", "max": "0.030", "status": "ok"},
+                    {"element": "S", "actual": "0.008", "min": "", "max": "0.030", "status": "ok"},
                 ],
                 "mechanical": [
                     {"property": "Yield Strength", "actual": "245 MPa", "requirement": "≥170 MPa", "status": "ok"},
@@ -144,7 +166,7 @@ class MockAiClient(BaseAiClient):
                 "chemical_composition": "FAIL",
                 "mechanical_properties": "OK",
                 "chemical": [
-                    {"element": "S", "actual": "0.042", "requirement": "≤0.030", "status": "fail"},
+                    {"element": "S", "actual": "0.042", "min": "", "max": "0.030", "status": "fail"},
                 ],
                 "mechanical": [
                     {"property": "Tensile Strength", "actual": "495 MPa", "requirement": "≥485 MPa", "status": "ok"},
