@@ -49,7 +49,8 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
     {"property": "Yield Strength Rp0.2", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
     {"property": "Tensile Strength", "actual": "<实测值>", "min": "<下限>", "max": "<上限>", "status": "ok"},
     {"property": "Elongation A%", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
-    {"property": "Hardness HB", "actual": "<实测值，如报告中为空或——则填空字符串>", "min": "", "max": "<上限，如报告中未给出则填空字符串>", "status": "ok"}
+    {"property": "Hardness HB", "actual": "<实测值，如报告中为空或——则填空字符串>", "min": "", "max": "<上限，如报告中未给出则填空字符串>", "status": "ok"},
+    {"property": "Impact Value", "actual": "<均值Mean value>", "min": "<下限，如60>", "max": "", "status": "ok"}
   ]
 }
 
