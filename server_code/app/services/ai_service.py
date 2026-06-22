@@ -15,50 +15,25 @@ logger = logging.getLogger(__name__)
 
 MAX_AI_LOG_CHARS = 4000
 
-AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN10204 3.1）审核专家。
-请分析材质报告图片，提取关键信息并判断化学成分和力学性能是否符合标准要求。
+AUDIT_PROMPT = """你是材质报告审核专家。分析报告图片，提取数据并返回 JSON（不要 markdown 代码块）。
 
-重要要求：
-- min 表示下限（最小允许值），max 表示上限（最大允许值），两者含义不同，绝对不能填相同的值。
-- min 和 max 必须严格按照报告表格中的 Min 行和 Max 行来填写，表格中该位置有值就填，没有值（空或 "－"）就填空字符串。
-- actual、min、max 都必须从报告图片中实际读取，不要自行假设或编造。
-- 力学性能中如果有多个屈服强度指标（如 Rp1.0 和 Rp0.2），必须作为独立的行分别列出，不要合并或遗漏。
-- 报告中出现的每一项力学性能测试都必须列出，包括冲击值（Impact Value）等。
+规则：
+1. 所有数值必须从报告中读取，禁止编造。报告中为空或"－"的填空字符串。
+2. min=表格Min行的值，max=表格Max行的值。该位置无值则填空字符串。
+3. Rp1.0 和 Rp0.2 分开列出。每项力学测试都要列出（含 Impact Value）。
 
-请严格返回 JSON（不要 markdown 代码块），格式如下：
+返回格式：
 {
   "ai_result": "PASS 或 FAIL",
-  "reasons": ["失败原因列表，PASS 时可为空"],
-  "supplier": "",
-  "certificate_number": "",
-  "material_grade": "",
-  "standard": "",
-  "heat_number": "",
-  "batch_number": "",
-  "date": "",
+  "reasons": [],
+  "supplier": "", "certificate_number": "", "material_grade": "",
+  "standard": "", "heat_number": "", "batch_number": "", "date": "",
   "chemical_composition": "OK 或 FAIL",
   "mechanical_properties": "OK 或 FAIL",
   "fields": [{"label": "Supplier", "value": "..."}],
-  "chemical": [
-    {"element": "C", "actual": "<实测值>", "min": "", "max": "<上限>", "status": "ok"},
-    {"element": "Cr", "actual": "<实测值>", "min": "<下限>", "max": "<上限>", "status": "ok"}
-  ],
-  "mechanical": [
-    {"property": "Yield Strength Rp1.0", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
-    {"property": "Yield Strength Rp0.2", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
-    {"property": "Tensile Strength", "actual": "<实测值>", "min": "<下限>", "max": "<上限>", "status": "ok"},
-    {"property": "Elongation A%", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
-    {"property": "Hardness HB", "actual": "<实测值，如报告中为空或——则填空字符串>", "min": "", "max": "<上限，如报告中未给出则填空字符串>", "status": "ok"},
-    {"property": "Impact Value", "actual": "<均值Mean value>", "min": "<下限，如60>", "max": "", "status": "ok"}
-  ]
+  "chemical": [{"element": "C", "actual": "", "min": "", "max": "", "status": "ok"}],
+  "mechanical": [{"property": "Tensile Strength", "actual": "", "min": "", "max": "", "status": "ok"}]
 }
-
-注意：
-- C 只有 max 没有 min，Cr 有 min 和 max 范围。
-- Yield Strength Rp1.0 和 Rp0.2 是两个独立的行，不要合并。
-- 如果报告中某项实测值为空、——、或未填写，actual 必须填空字符串，不要编造数值。
-- 如果报告中某项标准要求为空或未给出，min 和 max 也必须填空字符串。
-- 请严格按此模式填写，不要把同一个值同时填入 min 和 max。
 """
 
 
@@ -92,6 +67,8 @@ def _build_extraction(data: dict, file_name: str) -> tuple[str, AiExtractionResu
         if isinstance(c, dict):
             c_min = c.get("min", "")
             c_max = c.get("max", "")
+            if c_min and c_max and c_min == c_max:
+                logger.warning("化学成分 %s min==max==%s，模型可能识别有误，保留原值待人工确认", c.get("element"), c_max)
             if not c.get("requirement"):
                 if c_min and c_max:
                     c["requirement"] = f"{c_min}–{c_max}"
@@ -110,6 +87,8 @@ def _build_extraction(data: dict, file_name: str) -> tuple[str, AiExtractionResu
         if isinstance(m, dict):
             m_min = m.get("min", "")
             m_max = m.get("max", "")
+            if m_min and m_max and m_min == m_max:
+                logger.warning("力学性能 %s min==max==%s，模型可能识别有误，保留原值待人工确认", m.get("property"), m_max)
             if not m.get("requirement"):
                 if m_min and m_max:
                     m["requirement"] = f"{m_min}–{m_max}"
