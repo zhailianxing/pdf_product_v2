@@ -41,19 +41,24 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
   "mechanical_properties": "OK 或 FAIL",
   "fields": [{"label": "Supplier", "value": "..."}],
   "chemical": [
-    {"element": "C", "actual": "0.018", "min": "", "max": "0.030", "status": "ok"},
-    {"element": "Cr", "actual": "16.8", "min": "16.0", "max": "18.0", "status": "ok"}
+    {"element": "C", "actual": "<实测值>", "min": "", "max": "<上限>", "status": "ok"},
+    {"element": "Cr", "actual": "<实测值>", "min": "<下限>", "max": "<上限>", "status": "ok"}
   ],
   "mechanical": [
-    {"property": "Yield Strength Rp1.0", "actual": "269", "min": "210", "max": "", "status": "ok"},
-    {"property": "Yield Strength Rp0.2", "actual": "243", "min": "185", "max": "", "status": "ok"},
-    {"property": "Tensile Strength", "actual": "512", "min": "440", "max": "640", "status": "ok"},
-    {"property": "Elongation A%", "actual": "35", "min": "30", "max": "", "status": "ok"},
-    {"property": "Hardness HB", "actual": "165", "min": "", "max": "217", "status": "ok"}
+    {"property": "Yield Strength Rp1.0", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
+    {"property": "Yield Strength Rp0.2", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
+    {"property": "Tensile Strength", "actual": "<实测值>", "min": "<下限>", "max": "<上限>", "status": "ok"},
+    {"property": "Elongation A%", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
+    {"property": "Hardness HB", "actual": "<实测值，如报告中为空或——则填空字符串>", "min": "", "max": "<上限，如报告中未给出则填空字符串>", "status": "ok"}
   ]
 }
 
-注意上面示例中：C 只有 max 没有 min，Cr 有 min 和 max 范围。Yield Strength Rp1.0 和 Rp0.2 是两个独立的行，不要合并。请严格按此模式填写，不要把同一个值同时填入 min 和 max。
+注意：
+- C 只有 max 没有 min，Cr 有 min 和 max 范围。
+- Yield Strength Rp1.0 和 Rp0.2 是两个独立的行，不要合并。
+- 如果报告中某项实测值为空、——、或未填写，actual 必须填空字符串，不要编造数值。
+- 如果报告中某项标准要求为空或未给出，min 和 max 也必须填空字符串。
+- 请严格按此模式填写，不要把同一个值同时填入 min 和 max。
 """
 
 
