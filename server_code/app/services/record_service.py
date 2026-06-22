@@ -68,9 +68,12 @@ async def upload_and_audit(db: Session, file: UploadFile, user: User) -> RecordD
         shutil.copyfileobj(file.file, f)
 
     ai_client = get_ai_client()
-    ai_result, extraction, reasons, model_name, process_ms = await ai_client.audit_pdf(
-        save_path, file.filename
-    )
+    try:
+        ai_result, extraction, reasons, model_name, process_ms = await ai_client.audit_pdf(
+            save_path, file.filename
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=502, detail=f"AI 审核失败: {exc}") from exc
 
     record = UploadRecord(
         id=record_id,

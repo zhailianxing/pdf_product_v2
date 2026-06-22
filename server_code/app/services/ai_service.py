@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 import time
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -146,6 +147,52 @@ def _truncate_for_log(text: str, max_chars: int = MAX_AI_LOG_CHARS) -> str:
     return f"{text[:max_chars]}...<truncated {len(text) - max_chars} chars>"
 
 
+def _try_parse_json(text: str) -> dict:
+    """Try to parse JSON, attempting repair for truncated AI responses."""
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    repaired = text
+    # Close any unterminated string
+    open_quotes = repaired.count('"') % 2
+    if open_quotes:
+        repaired += '"'
+    # Balance brackets/braces
+    open_braces = repaired.count("{") - repaired.count("}")
+    open_brackets = repaired.count("[") - repaired.count("]")
+    repaired += "]" * max(open_brackets, 0)
+    repaired += "}" * max(open_braces, 0)
+
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort: find the outermost { ... } and try to parse that
+    match = re.search(r"\{", text)
+    if match:
+        depth = 0
+        last_close = -1
+        for i, ch in enumerate(text):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                last_close = i
+        if last_close > 0:
+            candidate = text[match.start() : last_close + 1]
+            try:
+                return json.loads(candidate)
+            except json.JSONDecodeError:
+                pass
+
+    raise ValueError(
+        f"AI 模型返回的 JSON 无法解析且修复失败，原始内容前 500 字符: {text[:500]}"
+    )
+
+
 class BaseAiClient(ABC):
     @abstractmethod
     async def audit_pdf(self, pdf_path: Path, file_name: str) -> tuple[str, AiExtractionResult, list[str], str, float]:
@@ -237,6 +284,7 @@ async def _audit_with_vision_api(
     payload: dict = {
         "model": model,
         "messages": [{"role": "user", "content": content}],
+        "max_tokens": 8192,
     }
     if request_options:
         payload.update(request_options)
@@ -314,7 +362,17 @@ async def _audit_with_vision_api(
     if text.startswith("```"):
         text = text.split("\n", 1)[-1].rsplit("```", 1)[0].strip()
 
-    data = json.loads(text)
+    try:
+        data = _try_parse_json(text)
+    except (json.JSONDecodeError, ValueError) as exc:
+        logger.error(
+            "视觉模型返回 JSON 解析失败 model=%s error=%s content=%s",
+            model,
+            exc,
+            _truncate_for_log(text),
+        )
+        raise ValueError(f"AI 模型返回的内容不是合法 JSON: {exc}") from exc
+
     result, extraction, reasons = _build_extraction(data, file_name)
     elapsed = (time.perf_counter() - start) * 1000
     return result, extraction, reasons, model, elapsed
