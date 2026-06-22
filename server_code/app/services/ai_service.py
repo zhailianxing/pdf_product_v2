@@ -284,7 +284,6 @@ async def _audit_with_vision_api(
     payload: dict = {
         "model": model,
         "messages": [{"role": "user", "content": content}],
-        "max_tokens": 8192,
     }
     if request_options:
         payload.update(request_options)
