@@ -1,3 +1,5 @@
+import re
+
 import base64
 import io
 import logging
@@ -25,6 +27,12 @@ def pdf_to_base64_images(pdf_path: str | Path, max_pages: int = 3, dpi: int = 15
 
 _CHEMICAL_ELEMENTS = {"C", "Si", "Mn", "P", "S", "Cr", "Mo", "Ni", "Ti", "N", "Cu", "Al", "V", "Nb", "CE", "W", "Co", "B"}
 
+_CHEM_LINE_RE = re.compile(
+    r"^(Min|Max)\s+[－—\-\d]"
+    r"|^C\s+Si\s+Mn\s+"
+    r"|^\d+\s+\d{5,}\s+\w+\s+\d+\.\d+"
+)
+
 
 def _normalize_cell(cell) -> str:
     if cell is None:
@@ -40,8 +48,8 @@ def _find_row_by_label(rows: list[list[str]], label: str) -> list[str] | None:
     return None
 
 
-def _extract_structured_data(tables: list[list[list]]) -> str | None:
-    """从 pdfplumber 表格中提取化学成分和力学性能，转为竖排格式。"""
+def _extract_chemical_data(tables: list[list[list]]) -> str | None:
+    """从 pdfplumber 表格中提取化学成分，转为每元素一行的竖排格式。"""
     for raw_table in tables:
         rows = [[_normalize_cell(c) for c in row] for row in raw_table]
 
@@ -90,11 +98,11 @@ def _extract_structured_data(tables: list[list[list]]) -> str | None:
             if row is None or idx >= len(row):
                 return ""
             v = row[idx].strip()
-            if v in ("－", "—", "—", "-"):
+            if v in ("－", "—", "—", "-", "–"):
                 return ""
             return v
 
-        lines = ["=== 化学成分 ==="]
+        lines = ["=== 化学成分（已从表格预处理，请直接使用）==="]
         for elem, j in elem_cols:
             min_val = _get(min_row, j)
             max_val = _get(max_row, j)
@@ -114,24 +122,43 @@ def _extract_structured_data(tables: list[list[list]]) -> str | None:
     return None
 
 
+def _strip_chemical_lines(text: str) -> str:
+    """从页面文本中移除化学成分相关的行（Min/Max 数据行、元素表头行、数据行）。"""
+    lines = text.splitlines()
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if _CHEM_LINE_RE.match(stripped):
+            continue
+        if stripped in ("1 2 3", "value", "Mean"):
+            continue
+        cleaned.append(stripped)
+    return "\n".join(cleaned)
+
+
 def pdf_to_text_and_tables(pdf_path: str | Path, max_pages: int = 3) -> str:
-    """用 pdfplumber 提取 PDF，化学成分做列对齐转竖排，其余用文本。"""
+    """用 pdfplumber 提取 PDF，化学成分做列对齐转竖排，其余用清理后的文本。"""
     sections: list[str] = []
 
     with pdfplumber.open(str(pdf_path)) as pdf:
         for page_index in range(min(len(pdf.pages), max_pages)):
             page = pdf.pages[page_index]
 
+            chem_data = None
             tables = page.extract_tables()
             if tables:
-                structured = _extract_structured_data(tables)
-                if structured:
-                    sections.append(structured)
+                chem_data = _extract_chemical_data(tables)
 
-            text = page.extract_text()
-            if text:
-                lines = [line.strip() for line in text.splitlines() if line.strip()]
-                sections.append("\n".join(lines))
+            text = page.extract_text() or ""
+
+            if chem_data:
+                sections.append(chem_data)
+                text = _strip_chemical_lines(text)
+
+            if text.strip():
+                sections.append(text.strip())
 
     result = "\n\n".join(sections)
     logger.info("PDF 文本提取完成 file=%s chars=%d", pdf_path, len(result))
