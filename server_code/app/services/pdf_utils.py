@@ -59,28 +59,19 @@ def _table_to_markdown(table: list[list[str]]) -> str:
 
 
 def pdf_to_text_and_tables(pdf_path: str | Path, max_pages: int = 3) -> str:
-    """用 pdfplumber 提取 PDF 的文本和表格，返回清理后的 Markdown 文本。"""
+    """用 pdfplumber 提取 PDF 的文本，返回紧凑的纯文本内容。"""
     sections: list[str] = []
 
     with pdfplumber.open(str(pdf_path)) as pdf:
         for page_index in range(min(len(pdf.pages), max_pages)):
             page = pdf.pages[page_index]
-
-            tables = page.extract_tables()
-            if tables:
-                for i, raw_table in enumerate(tables):
-                    cleaned = _clean_table(raw_table)
-                    md = _table_to_markdown(cleaned)
-                    if md:
-                        sections.append(f"=== 表格 {i + 1} ===\n{md}")
-
             text = page.extract_text()
             if text:
-                sections.append(f"=== 页面 {page_index + 1} 文本 ===\n{text}")
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                sections.append("\n".join(lines))
 
     result = "\n\n".join(sections)
-    logger.info("PDF 文本提取完成 file=%s chars=%d tables=%d",
-                pdf_path, len(result), sum(1 for s in sections if s.startswith("=== 表格")))
+    logger.info("PDF 文本提取完成 file=%s chars=%d", pdf_path, len(result))
     return result
 
 
