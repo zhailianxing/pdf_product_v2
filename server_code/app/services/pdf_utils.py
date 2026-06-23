@@ -23,21 +23,43 @@ def pdf_to_base64_images(pdf_path: str | Path, max_pages: int = 3, dpi: int = 15
     return images
 
 
-def _table_to_markdown(table: list[list[str | None]]) -> str:
-    """将 pdfplumber 提取的表格转为 Markdown 格式。"""
+def _clean_table(table: list[list[str | None]]) -> list[list[str]]:
+    """去掉完全空的行和列，合并多行文本。"""
+    if not table:
+        return []
+    cleaned = []
+    for row in table:
+        cells = [str(cell).replace("\n", " ").strip() if cell else "" for cell in row]
+        cleaned.append(cells)
+
+    if not cleaned:
+        return []
+
+    num_cols = len(cleaned[0])
+    non_empty_cols = [
+        j for j in range(num_cols)
+        if any(cleaned[i][j] for i in range(len(cleaned)))
+    ]
+    cleaned = [[row[j] for j in non_empty_cols] for row in cleaned]
+
+    result = [row for row in cleaned if any(cell for cell in row)]
+    return result
+
+
+def _table_to_markdown(table: list[list[str]]) -> str:
+    """将清理后的表格转为 Markdown 格式。"""
     if not table:
         return ""
     rows = []
     for row in table:
-        cells = [str(cell).strip() if cell else "" for cell in row]
-        rows.append("| " + " | ".join(cells) + " |")
+        rows.append("| " + " | ".join(row) + " |")
         if len(rows) == 1:
-            rows.append("| " + " | ".join(["---"] * len(cells)) + " |")
+            rows.append("| " + " | ".join(["---"] * len(row)) + " |")
     return "\n".join(rows)
 
 
 def pdf_to_text_and_tables(pdf_path: str | Path, max_pages: int = 3) -> str:
-    """用 pdfplumber 提取 PDF 的文本和表格，返回结构化的 Markdown 文本。"""
+    """用 pdfplumber 提取 PDF 的文本和表格，返回清理后的 Markdown 文本。"""
     sections: list[str] = []
 
     with pdfplumber.open(str(pdf_path)) as pdf:
@@ -46,8 +68,9 @@ def pdf_to_text_and_tables(pdf_path: str | Path, max_pages: int = 3) -> str:
 
             tables = page.extract_tables()
             if tables:
-                for i, table in enumerate(tables):
-                    md = _table_to_markdown(table)
+                for i, raw_table in enumerate(tables):
+                    cleaned = _clean_table(raw_table)
+                    md = _table_to_markdown(cleaned)
                     if md:
                         sections.append(f"=== 表格 {i + 1} ===\n{md}")
 
