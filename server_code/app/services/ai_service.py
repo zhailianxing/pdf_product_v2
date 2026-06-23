@@ -435,6 +435,8 @@ async def _audit_with_text_api(
     if not pdf_text.strip():
         raise ValueError("无法从 PDF 中提取文本内容")
 
+    logger.info("pdfplumber 解析结果 file=%s:\n%s", file_name, pdf_text)
+
     prompt = AUDIT_PROMPT_TEXT + pdf_text
 
     payload: dict = {
