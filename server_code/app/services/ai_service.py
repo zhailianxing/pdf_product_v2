@@ -108,7 +108,7 @@ AUDIT_PROMPT = """你是金属材料材质报告（Material Certificate / EN1020
   "chemical": [
     {"element": "C", "actual": "<实测值>", "min": "", "max": "<上限>", "status": "ok"},
     {"element": "Cr", "actual": "<实测值>", "min": "<下限>", "max": "<上限>", "status": "ok"},
-    {"element": "Delta Ferrite", "actual": "0.15%", "min": "", "max": "1%", "status": "ok"}
+    {"element": "Delta Ferrite", "actual": "<实测值>", "min": "<下限>"", "max": "<上限>", "status": "ok"}
   ],
   "mechanical": [
     {"property": "Yield Strength Rp1.0", "actual": "<实测值>", "min": "<下限>", "max": "", "status": "ok"},
