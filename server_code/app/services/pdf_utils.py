@@ -5,8 +5,15 @@ from pathlib import Path
 import fitz
 
 
-def pdf_to_base64_images(pdf_path: str | Path, max_pages: int = 3, dpi: int = 150) -> list[str]:
-    """将 PDF 前几页转为 base64 PNG，供视觉模型使用。"""
+def pdf_to_base64_images(pdf_path: str | Path, max_pages: int = 3, dpi: int = 220) -> list[str]:
+    """将 PDF 前几页转为 base64 PNG，供视觉模型使用。
+
+    DPI 220 是 A4 横版材质报告在 Qwen3-VL 上的清晰度/速度甜点：
+    比 150 提升约 2× 像素密度，可以让 Delta Ferrite 这种窄列里的
+    "1%" 和空白单元格在 vision tokens 里区分得更明确，显著降低
+    行错位（min/max 互换）的概率。再高（300+）反而会触发 Qwen-VL
+    的 patch 上限和速度下降。
+    """
     images: list[str] = []
     doc = fitz.open(str(pdf_path))
     try:
